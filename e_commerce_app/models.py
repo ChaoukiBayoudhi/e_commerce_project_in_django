@@ -4,6 +4,11 @@ from django.utils import timezone
 
 
 # Create your models here.
+#Define a django enumeration
+class ClientType(models.TextChoices):
+    normal=('NORMAL','Normal Customer')
+    loyal=('LOYAL','Loyal Customer')
+    vip=('VIP','VIP Customer')
 class Address(models.Model):
     houseNumber = models.PositiveSmallIntegerField(default=0)
     street = models.CharField(max_length=50, default='')
@@ -76,8 +81,8 @@ class Product(models.Model):
 
 class Client(User):
     familyName = models.CharField(max_length=100, default='')
-    typeClient = models.CharField(max_length=50, choices=[('LOYAL', 'Loyal Customer'), ('NORMAL', 'Normal Customer'),
-                                                          ('VIP', 'Very Import Customer')], default='NORMAL')
+    #typeClient = models.CharField(max_length=50, choices=[('LOYAL', 'Loyal Customer'), ('NORMAL', 'Normal Customer'),('VIP', 'Very Import Customer')], default='NORMAL')
+    typeClient = models.CharField(max_length=50, choices=ClientType.choices, default=ClientType.normal)
     client_products = models.ManyToManyField(Product, through='Command', through_fields=('client', 'product'))
 
     class Meta:
