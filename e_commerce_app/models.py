@@ -19,6 +19,9 @@ class Address(models.Model):
     class Meta:
         db_table = 'address'
         ordering = ['country', 'city']
+    def __str__(self):
+        return f'id = {self.id}'
+    
 
 
 class User(models.Model):
@@ -41,11 +44,13 @@ class Provider(User):
 
     class Meta:
         db_table = 'providers'
+        
 
     def __str__(self):
         # return f'name={self.name}, email={self.email}, phone={self.phone}, site_url={self.site_url}'
         # or
-        return super().__str__() + f', site_url={self.site_url}'
+        #return super().__str__() + f', site_url={self.site_url}'
+        return self.name
 
 
 class Product(models.Model):
@@ -76,8 +81,8 @@ class Product(models.Model):
         # return 'label = ',self.label,', price = ',self.price,', stock = ',self.stock
         # return 'label = {}, price = {}, stock = {}'.format(self.label,self.price,self.stock)
         # return 'label=%s, price=%s, stock=%s'%(self.label,self.price,self.stock)
-        return f'label={self.label}, price={self.price}, stock={self.stock}'
-
+        #return f'label={self.label}, price={self.price}, stock={self.stock},'
+        return f'id={self.id}'
 
 class Client(User):
     familyName = models.CharField(max_length=100, default='')
@@ -87,7 +92,9 @@ class Client(User):
 
     class Meta:
         db_table = 'clients'
-
+    def __str__(self):
+        return f'id={self.id}'
+    
 
 class Command(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
