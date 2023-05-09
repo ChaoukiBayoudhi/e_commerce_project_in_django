@@ -1,3 +1,4 @@
+
 from django.shortcuts import render
 from .models import Address, Product,Client, Provider,Command
 from rest_framework import viewsets,authentication,permissions
@@ -5,6 +6,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework import status
 from django.db.models import Max,Min
+#import timezone
+from django.utils import timezone
 from .serializers import AddressSerializer, CommandSerializer, ProductSerializer,ClientSerializer, ProviderSerializer
 # Overview of Django predefined methods: all(), save(), create(), filter(),exclude(), aggregate(),values()
 #select * from product; => res=Product.objects.all()
@@ -22,13 +25,26 @@ class ProductViewSet(viewsets.ModelViewSet):
         queryset = Product.objects.all()
         serializer_class = ProductSerializer
         #add  some custom methods to the viewset
-        @action(methods=['get'],detail=True)
+        #detail=True if the method is applied to a specific object
+        #detail=False if the method is applied to a list of objects (all objects)
+        @action(methods=['get'],detail=False)
         def max_min_price(self,request):
             if request.method!='GET':
-                return Response({'message':'the method is not allowed','status':status.HTTP_405_METHOD_NOT_ALLOWED})
-            #get the maximum and the minimum price
-            res=Product.objects.aggregate(Max('price'),Min('price'))
-            return Response({'max price ':res(0),'min price':res(1)})
+                return Response({'message':'The method is not allowed','status':status.HTTP_405_METHOD_NOT_ALLOWED})
+            #get the maximum price
+            max_price = Product.objects.aggregate(Max('price'))['price__max']
+            #get the minimum price
+            min_price = Product.objects.aggregate(Min('price'))['price__min']
+            #get the product with the maximum price
+            p_max=Product.objects.get(price=max_price)
+            #get the product with the minimum price
+            p_min=Product.objects.get(price=min_price)
+            #serialize p_max and p_min
+            serializer = ProductSerializer(p_max)
+            #if the object is a list of objects, we should use many=True
+            #serializer = ProductSerializer(p_max,many=True)
+            serializer1 = ProductSerializer(p_min)
+            return Response({'Product with max price':serializer.data,'Product with price':serializer1.data})
 class ClientViewSet(viewsets.ModelViewSet):
     
         queryset = Client.objects.all()
@@ -136,3 +152,29 @@ class ProviderViewSet(viewsets.ModelViewSet):
 class CommandViewSet(viewsets.ModelViewSet):
     queryset=Command.objects.all()
     serializer_class=CommandSerializer
+
+    #define a custom method to get the products in stock ordered by a given client
+    #The method should return products ordered by a given client in a period
+    @action(detail=True, methods=['get'])
+    def client_products(self, request, pk=None):
+        client_id = request.query_params.get('client_id', None)
+        start_date = request.query_params.get('start_date', None)
+        end_date = request.query_params.get('end_date', None)
+
+        if client_id and start_date and end_date:
+            try:
+                client = Client.objects.get(pk=client_id)
+                start_date = timezone.datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date = timezone.datetime.strptime(end_date, '%Y-%m-%d').date()
+            except (ValueError, Client.DoesNotExist):
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            commands = Command.objects.filter(client=client, date_cmd__range=[start_date, end_date])
+            product_ids = [command.product.id for command in commands]
+            products = Product.objects.filter(id__in=product_ids, stock__gt=0).order_by('label')
+
+            serializer = ProductSerializer(products, many=True)
+            return Response(serializer.data)
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+    
