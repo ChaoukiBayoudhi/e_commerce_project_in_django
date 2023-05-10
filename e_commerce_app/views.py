@@ -156,11 +156,21 @@ class CommandViewSet(viewsets.ModelViewSet):
     #define a custom method to get the products in stock ordered by a given client
     #The method should return products ordered by a given client in a period
     @action(detail=True, methods=['get'])
-    def client_products(self, request, pk=None):
+    #1st case
+    #the method signature should as the line below, if the url is
+    #http://localhost:8000/command/1/client_products?start_date=2020-01-01&end_date=2020-12-31
+    #def client_products(self, request, pk=None):
+    #2nd case
+    #if the url is http://localhost:8000/command/client_products?client_id=1&start_date=2020-01-01&end_date=2020-12-31
+    #the method signature should be as the line below
+    def client_products(self, request):
+        #the line below is for the 2nd case
+        #get the client_id, start_date and end_date from the url
+        #client_id, start_date and end_date are the query parameters name
         client_id = request.query_params.get('client_id', None)
         start_date = request.query_params.get('start_date', None)
         end_date = request.query_params.get('end_date', None)
-
+        #if request parameters are not null (the client has initiated the request parameters)
         if client_id and start_date and end_date:
             try:
                 client = Client.objects.get(pk=client_id)
@@ -168,13 +178,50 @@ class CommandViewSet(viewsets.ModelViewSet):
                 end_date = timezone.datetime.strptime(end_date, '%Y-%m-%d').date()
             except (ValueError, Client.DoesNotExist):
                 return Response(status=status.HTTP_400_BAD_REQUEST)
-
+            #get the commands of the client between the start_date and the end_date
             commands = Command.objects.filter(client=client, date_cmd__range=[start_date, end_date])
+           #create a list of product ids
             product_ids = [command.product.id for command in commands]
+            #get the products of the client between the start_date and the end_date that are in stock
             products = Product.objects.filter(id__in=product_ids, stock__gt=0).order_by('label')
-
+            #serialize the products => convert the products objects to json
             serializer = ProductSerializer(products, many=True)
+            #serializer.data return a json array (or list)
             return Response(serializer.data)
 
         return Response(status=status.HTTP_400_BAD_REQUEST)
-    
+
+    #get clients that are not satisfied
+    #clients have ordered products but the ordered quantity  is insufficient
+    #focus on command passed in given period
+    #in the browser or in a front-end the url will be like
+    #we have two query parameters start_date and end_date
+    @action(detail=False, methods=['get'])
+    #request is the http entity sent by the front-end or the client to the backend
+    #request contains the headers and the body(data)
+    #the headers contain the request method (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD), encoding, content-type, authorization, etc...
+    def not_satisfied_clients(self, request):
+        #get the start_date and end_date from the url
+        #the None is the default value if the query parameter is not provided
+        start_date = request.query_params.get('start_date', None)
+        end_date = request.query_params.get('end_date', None)
+        #if request parameters are not null (the client has initiated the request parameters)
+        if start_date and end_date:
+            try:
+                start_date = timezone.datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date = timezone.datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+            #get the commands between the start_date and the end_date
+            commands = Command.objects.filter(date_cmd__range=[start_date, end_date])
+            #create a list of client ids
+            client_ids = [command.client.id for command in commands]
+            #get the clients that have ordered products but the ordered quantity  is insufficient
+            clients = Client.objects.filter(id__in=client_ids, client_products__stock__lte=0).distinct().order_by('name')
+            #serialize the clients => convert the clients objects to json
+            #many=True because we have a list of clients
+            serializer = ClientSerializer(clients, many=True)
+            #serializer.data return a json array (or list)
+            return Response(serializer.data,status=status.HTTP_200_OK)
+
+        return Response(status=status.HTTP_400_BAD_REQUEST)
