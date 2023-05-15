@@ -25,5 +25,7 @@ urlpatterns = [
     path('max_min_price/', ProductViewSet.as_view({'get': 'max_min_price'}), name='max_min_price'),
     #if we are on the 1st case (go to the views.py line 159)
     #path(r'<int:pk>/client_products/', CommandViewSet.as_view({'get': 'client_products'}), name='client_products'),
-    path(r'w', CommandViewSet.as_view({'get': 'client_products'}), name='client_products'),
+    path(r'client_products', CommandViewSet.as_view({'get': 'client_products'}), name='client_products'),
+    path('not_satisfied/',CommandViewSet.as_view({'get':'not_satisfied_clients'})
+         , name='not_satisfied_clients'),
 ]
